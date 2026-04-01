@@ -70,4 +70,36 @@ struct PolygonData {
     std::size_t total_vertices = 0;
 };
 
+// Plain exported ring representation used for final output/reporting.
+struct OutputRing {
+    int ring_id = -1;
+    std::vector<Point> vertices;
+};
+
+// Final program output bundle returned by the simplifier core.
+struct ProgramOutput {
+    std::vector<OutputRing> rings;
+    double input_signed_area = 0.0;
+    double output_signed_area = 0.0;
+    double total_areal_displacement = 0.0;
+};
+
+// Parses the input CSV file into linked-list rings.
+PolygonData read_polygon_csv(const std::string& path);
+
+// Runs the simplification algorithm until the requested target is reached or no
+// more valid collapses remain.
+ProgramOutput simplify_polygon(PolygonData& polygon, std::size_t target_vertices);
+
+// Converts the linked-list representation back into plain vectors for printing.
+std::vector<OutputRing> export_rings(const PolygonData& polygon);
+
+// Computes the algebraic sum of ring areas across the polygon.
+double compute_total_signed_area(const std::vector<OutputRing>& rings);
+
+// Estimates the total areal displacement between the original and simplified
+// ring sets by comparing vertical cross-sections.
+double compute_total_areal_displacement(const std::vector<OutputRing>& original,
+                                        const std::vector<OutputRing>& simplified);
+
 }  // namespace
