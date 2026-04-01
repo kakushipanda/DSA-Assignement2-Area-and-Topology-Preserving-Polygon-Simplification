@@ -285,6 +285,82 @@ bool topology_ok(const PolygonData& polygon, const Candidate& candidate) {
     return true;
 }
 
+// Allocates a new vertex (usually a Steiner point introduced by a collapse).
+Vertex* create_vertex(PolygonData& polygon, int ring_id, const Point& point) {
+    auto vertex = std::make_unique<Vertex>();
+    vertex->id = static_cast<int>(polygon.storage.size());
+    vertex->ring_id = ring_id;
+    vertex->point = point;
+    Vertex* raw = vertex.get();
+    polygon.storage.push_back(std::move(vertex));
+    return raw;
+}
+
+// Applies a validated candidate: splice in the replacement vertex, retire the
+// removed vertices, and update bookkeeping counters.
+void collapse_candidate(PolygonData& polygon, Ring& ring, const Candidate& candidate, double& total_displacement) {
+    Vertex* a = candidate.a;
+    Vertex* b = candidate.b;
+    Vertex* c = candidate.c;
+    Vertex* d = candidate.d;
+
+    Vertex* replacement = create_vertex(polygon, ring.ring_id, candidate.replacement);
+    replacement->prev = a;
+    replacement->next = d;
+    a->next = replacement;
+    d->prev = replacement;
+
+    if (ring.head == b || ring.head == c) {
+        ring.head = replacement;
+    }
+
+    b->alive = false;
+    c->alive = false;
+    ++a->version;
+    ++d->version;
+    ++b->version;
+    ++c->version;
+    ++replacement->version;
+
+    ring.size -= 1;
+    polygon.total_vertices -= 1;
+    total_displacement += candidate.displacement;
+}
+
+// Serializes a circular linked-list ring into an ordered vector of points.
+std::vector<Point> ring_to_points(const Ring& ring) {
+    std::vector<Point> points;
+    if (!ring.head) {
+        return points;
+    }
+    Vertex* current = ring.head;
+    for (std::size_t i = 0; i < ring.size; ++i) {
+        points.push_back(current->point);
+        current = current->next;
+    }
+    return points;
+}
+
+// Captures the starting polygon before any simplification occurs.
+std::vector<OutputRing> clone_original(const PolygonData& polygon) {
+    std::vector<OutputRing> rings;
+    rings.reserve(polygon.rings.size());
+    for (const Ring& ring : polygon.rings) {
+        rings.push_back({ring.ring_id, ring_to_points(ring)});
+    }
+    return rings;
+}
+
+// Computes an explicit segment intersection point when one exists.
+std::optional<Point> segment_intersection_point(const Segment& s1, const Segment& s2) {
+    if (!segments_intersect(s1, s2)) {
+        return std::nullopt;
+    }
+    return line_intersection(s1.a, s1.b, s2.a, s2.b);
+}
+
+
+
 
     } // namespace
 } // namespace simplify
