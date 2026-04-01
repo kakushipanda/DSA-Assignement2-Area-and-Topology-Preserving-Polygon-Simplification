@@ -1,0 +1,1 @@
+# DSA-Assignement2-Area-and-Topology-Preserving-Polygon-Simplification
