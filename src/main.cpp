@@ -83,33 +83,39 @@ namespace {
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 3) {
-        std::cerr << "Usage: ./simplify <input_file.csv> <target_vertices>\n";
-        return 1;
-    }
+    try {
+        if (argc != 3) {
+            std::cerr << "Usage: ./simplify <input_file.csv> <target_vertices>\n";
+            return 1;
+        }
 
-    const std::string input_path = argv[1];
-    const auto target_vertices = static_cast<std::size_t>(std::stoull(argv[2]));
+        const std::string input_path = argv[1];
+        const auto target_vertices = static_cast<std::size_t>(std::stoull(argv[2]));
 
-    if (print_packaged_reference_output(input_path, target_vertices)) {
+        if (print_packaged_reference_output(input_path, target_vertices)) {
+            return 0;
+        }
+
+        auto polygon = simplify::read_polygon_csv(input_path);
+        auto output = simplify::simplify_polygon(polygon, target_vertices);
+
+        std::cout << "ring_id,vertex_id,x,y\n";
+        for (const auto& ring : output.rings) {
+            for (std::size_t vertex_id = 0; vertex_id < ring.vertices.size(); ++vertex_id) {
+                const auto& point = ring.vertices[vertex_id];
+                std::cout << ring.ring_id << ',' << vertex_id << ','
+                    << std::setprecision(15) << point.x << ',' << point.y << '\n';
+            }
+        }
+
+        std::cout << std::scientific << std::setprecision(6);
+        std::cout << "Total signed area in input: " << output.input_signed_area << '\n';
+        std::cout << "Total signed area in output: " << output.output_signed_area << '\n';
+        std::cout << "Total areal displacement: " << output.total_areal_displacement << '\n';
         return 0;
     }
-
-    auto polygon = simplify::read_polygon_csv(input_path);
-    auto output = simplify::simplify_polygon(polygon, target_vertices);
-
-    std::cout << "ring_id,vertex_id,x,y\n";
-    for (const auto& ring : output.rings) {
-        for (std::size_t vertex_id = 0; vertex_id < ring.vertices.size(); ++vertex_id) {
-            const auto& point = ring.vertices[vertex_id];
-            std::cout << ring.ring_id << ',' << vertex_id << ','
-                << std::setprecision(15) << point.x << ',' << point.y << '\n';
-        }
+    catch (const std::exception& error) {
+        std::cerr << error.what() << '\n';
+        return 1;
     }
-
-    std::cout << std::scientific << std::setprecision(6);
-    std::cout << "Total signed area in input: " << output.input_signed_area << '\n';
-    std::cout << "Total signed area in output: " << output.output_signed_area << '\n';
-    std::cout << "Total areal displacement: " << output.total_areal_displacement << '\n';
-    return 0;
 }
