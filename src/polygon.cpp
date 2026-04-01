@@ -177,6 +177,114 @@ double local_areal_displacement(const Point& a, const Point& b, const Point& c, 
     return area;
 }
 
+// Verifies that a priority-queue candidate still matches the live linked-list
+// topology after earlier collapses may have modified neighboring vertices.
+bool candidate_is_current(const Candidate& candidate) {
+    if (!candidate.a || !candidate.b || !candidate.c || !candidate.d) {
+        return false;
+    }
+    if (!candidate.a->alive || !candidate.b->alive || !candidate.c->alive || !candidate.d->alive) {
+        return false;
+    }
+    if (candidate.a->next != candidate.b || candidate.b->next != candidate.c || candidate.c->next != candidate.d) {
+        return false;
+    }
+    if (candidate.b->prev != candidate.a || candidate.c->prev != candidate.b || candidate.d->prev != candidate.c) {
+        return false;
+    }
+    return candidate.a->version == candidate.a_version && candidate.b->version == candidate.b_version &&
+           candidate.c->version == candidate.c_version && candidate.d->version == candidate.d_version;
+}
+
+// Builds a fresh candidate collapse around the current vertex B.
+std::optional<Candidate> make_candidate(Vertex* b) {
+    if (!b || !b->alive) {
+        return std::nullopt;
+    }
+    Vertex* a = b->prev;
+    Vertex* c = b->next;
+    if (!a || !c) {
+        return std::nullopt;
+    }
+    Vertex* d = c->next;
+    if (!d || !a->alive || !c->alive || !d->alive) {
+        return std::nullopt;
+    }
+    if (a == b || b == c || c == d || d == a) {
+        return std::nullopt;
+    }
+
+    const auto replacement = choose_replacement(a->point, b->point, c->point, d->point);
+    if (!replacement) {
+        return std::nullopt;
+    }
+
+    const double displacement = local_areal_displacement(a->point, b->point, c->point, d->point, *replacement);
+    if (!std::isfinite(displacement)) {
+        return std::nullopt;
+    }
+
+    return Candidate{b, a, c, d, *replacement, displacement, a->version, b->version, c->version, d->version};
+}
+
+// Shared-endpoint contacts with adjacent segments are allowed during topology
+// checks, so we explicitly identify those benign cases.
+bool segments_share_allowed_endpoint(const Segment& first, const Segment& second) {
+    const bool share_a = same_point(first.a, second.a) || same_point(first.a, second.b);
+    const bool share_b = same_point(first.b, second.a) || same_point(first.b, second.b);
+    return share_a || share_b;
+}
+
+// Collects every currently live ring edge. The implementation is simple and
+// favors readability over aggressive spatial indexing.
+std::vector<std::pair<Vertex*, Vertex*>> collect_segments(const PolygonData& polygon) {
+    std::vector<std::pair<Vertex*, Vertex*>> segments;
+    for (const Ring& ring : polygon.rings) {
+        if (!ring.head || ring.size < 2) {
+            continue;
+        }
+        Vertex* current = ring.head;
+        for (std::size_t i = 0; i < ring.size; ++i) {
+            segments.emplace_back(current, current->next);
+            current = current->next;
+        }
+    }
+    return segments;
+}
+
+// Rejects a collapse if either new edge A-E or E-D would intersect an existing
+// edge outside the locally replaced neighborhood.
+bool topology_ok(const PolygonData& polygon, const Candidate& candidate) {
+    Segment new_first{candidate.a->point, candidate.replacement};
+    Segment new_second{candidate.replacement, candidate.d->point};
+
+    const std::set<int> ignored_ids = {
+        candidate.a->id,
+        candidate.b->id,
+        candidate.c->id,
+        candidate.d->id,
+        candidate.a->prev->id,
+        candidate.d->next->id,
+    };
+
+    for (const auto& [u, v] : collect_segments(polygon)) {
+        if (!u->alive || !v->alive) {
+            continue;
+        }
+        if (ignored_ids.count(u->id) && ignored_ids.count(v->id)) {
+            continue;
+        }
+        Segment existing{u->point, v->point};
+        if (segments_intersect(existing, new_first) && !segments_share_allowed_endpoint(existing, new_first)) {
+            return false;
+        }
+        if (segments_intersect(existing, new_second) && !segments_share_allowed_endpoint(existing, new_second)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 
     } // namespace
 } // namespace simplify
