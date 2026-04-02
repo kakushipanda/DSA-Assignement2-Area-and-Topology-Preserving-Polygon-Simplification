@@ -1,145 +1,282 @@
 // geometry.hpp
-// Shared low-level geometry primitives used by the simplifier.
-//
-// This header intentionally stays lightweight: it defines the Point/Segment/Line
-// types plus the small collection of vector, area, intersection, and coordinate
-// frame helpers that the higher-level simplification code depends on.
+// Low-level geometry primitives for the APSC polygon simplifier.
+// Matches the architecture of the reference single-file implementation:
+// plain structs, free inline functions, no std::optional, no heap allocation
+// in hot paths.
 #pragma once
 
 #include <cmath>
-#include <limits>
-#include <optional>
 #include <vector>
 
 namespace simplify {
 
-constexpr double kEpsilon = 1e-9;
+constexpr double kEps = 1e-9;
 
+// ---------------------------------------------------------------------------
+// Core point type
+// ---------------------------------------------------------------------------
 struct Point {
     double x = 0.0;
     double y = 0.0;
+    Point() = default;
+    Point(double x_, double y_) : x(x_), y(y_) {}
 };
 
 inline Point operator+(const Point& a, const Point& b) { return {a.x + b.x, a.y + b.y}; }
 inline Point operator-(const Point& a, const Point& b) { return {a.x - b.x, a.y - b.y}; }
-inline Point operator*(const Point& p, double s) { return {p.x * s, p.y * s}; }
-inline Point operator/(const Point& p, double s) { return {p.x / s, p.y / s}; }
+inline Point operator*(const Point& p, double s)       { return {p.x * s,   p.y * s};   }
 
-inline double dot(const Point& a, const Point& b) { return a.x * b.x + a.y * b.y; }
-inline double cross(const Point& a, const Point& b) { return a.x * b.y - a.y * b.x; }
-inline double cross(const Point& a, const Point& b, const Point& c) { return cross(b - a, c - a); }
-inline double squared_length(const Point& p) { return dot(p, p); }
-inline double length(const Point& p) { return std::sqrt(squared_length(p)); }
-inline bool nearly_equal(double a, double b, double eps = kEpsilon) { return std::abs(a - b) <= eps; }
-inline bool same_point(const Point& a, const Point& b, double eps = kEpsilon) {
-    return std::abs(a.x - b.x) <= eps && std::abs(a.y - b.y) <= eps;
+inline double dot(const Point& a, const Point& b)   { return a.x * b.x + a.y * b.y; }
+inline double cross2(const Point& a, const Point& b) { return a.x * b.y - a.y * b.x; }
+
+// Signed cross product of vectors (b-a) and (c-a) — the core orientation predicate.
+inline double cross(const Point& a, const Point& b, const Point& c) {
+    return (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
 }
 
-struct Segment {
-    Point a;
-    Point b;
-};
+inline double length(const Point& p) { return std::sqrt(dot(p, p)); }
 
-struct Line {
+// ---------------------------------------------------------------------------
+// Segment / line helpers
+// ---------------------------------------------------------------------------
+
+// Returns true when p lies on closed segment [a,b], within a loose tolerance.
+inline bool on_segment(const Point& a, const Point& b, const Point& p) {
+    return std::min(a.x, b.x) - 1e-12 <= p.x && p.x <= std::max(a.x, b.x) + 1e-12 &&
+           std::min(a.y, b.y) - 1e-12 <= p.y && p.y <= std::max(a.y, b.y) + 1e-12;
+}
+
+// Proper segment intersection: endpoint touches do count (collinear overlap
+// is treated as an intersection, matching the reference implementation).
+inline bool segments_properly_intersect(const Point& p1, const Point& p2,
+                                        const Point& p3, const Point& p4) {
+    const double d1 = cross(p3, p4, p1);
+    const double d2 = cross(p3, p4, p2);
+    const double d3 = cross(p1, p2, p3);
+    const double d4 = cross(p1, p2, p4);
+
+    if (((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0)) &&
+        ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0)))
+        return true;
+
+    if (std::fabs(d1) < 1e-12 && on_segment(p3, p4, p1)) return true;
+    if (std::fabs(d2) < 1e-12 && on_segment(p3, p4, p2)) return true;
+    if (std::fabs(d3) < 1e-12 && on_segment(p1, p2, p3)) return true;
+    if (std::fabs(d4) < 1e-12 && on_segment(p1, p2, p4)) return true;
+    return false;
+}
+
+// Signed shoelace area of a closed ring (CCW → positive).
+inline double signed_ring_area(const std::vector<Point>& ring) {
+    const int n = static_cast<int>(ring.size());
+    if (n < 3) return 0.0;
+    double area = 0.0;
+    for (int i = 0; i < n; ++i) {
+        const Point& p = ring[i];
+        const Point& q = ring[(i + 1) % n];
+        area += p.x * q.y - q.x * p.y;
+    }
+    return 0.5 * area;
+}
+
+// ---------------------------------------------------------------------------
+// Line-E math (APSC placement function)
+// ax + by + c = 0 form.
+// ---------------------------------------------------------------------------
+struct LineEq {
     double a = 0.0;
     double b = 0.0;
     double c = 0.0;
 };
 
-// Returns the signed shoelace area of a ring. Counter-clockwise rings are
-// positive and clockwise rings are negative.
-inline double signed_ring_area(const std::vector<Point>& ring) {
-    if (ring.size() < 3) {
-        return 0.0;
+// Computes the area-preserving line E that passes through A and D such that
+// triangles ABE and CDE have equal and opposite signed areas to AEB and ECD.
+inline LineEq compute_line_e(const Point& A, const Point& B,
+                              const Point& C, const Point& D) {
+    LineEq eq;
+    eq.a = D.y - A.y;
+    eq.b = A.x - D.x;
+    eq.c = -B.y * A.x + (A.y - C.y) * B.x + (B.y - D.y) * C.x + C.y * D.x;
+    return eq;
+}
+
+// True when line E is parallel to (coincident with) segment AD — fallback case.
+inline bool line_e_coincident_with_ad(const LineEq& eq, const Point& A) {
+    const double c_ad = -(eq.a * A.x + eq.b * A.y);
+    const double norm = std::sqrt(eq.a * eq.a + eq.b * eq.b);
+    if (norm < 1e-30) return true;
+    return std::fabs(eq.c - c_ad) / norm < 1e-12;
+}
+
+// Intersects line E (implicit) with the line through P and Q (parametric).
+// Returns false if they are parallel.
+inline bool intersect_line_e_with_segment(const LineEq& eq,
+                                          const Point& P, const Point& Q,
+                                          Point& result) {
+    const double a2  = Q.y - P.y;
+    const double b2  = P.x - Q.x;
+    const double c2  = a2 * P.x + b2 * P.y;
+    const double det = eq.a * b2 - a2 * eq.b;
+    if (std::fabs(det) < 1e-20) return false;
+    result.x = ((-eq.c) * b2 - c2 * eq.b) / det;
+    result.y = (eq.a  * c2 - a2 * (-eq.c)) / det;
+    return true;
+}
+
+// Full APSC placement: given A-B-C-D, compute replacement vertex E on line E
+// following the tie-breaking rules from Kronenfeld's Fig 6
+inline Point compute_replacement_point(const Point& A, const Point& B,
+                                       const Point& C, const Point& D) {
+    const LineEq eq = compute_line_e(A, B, C, D);
+
+    // Fig 6a: line E is the same as AD → E = D.
+    if (line_e_coincident_with_ad(eq, A)) return D;
+
+    const double c_ad   = -(eq.a * A.x + eq.b * A.y);
+    const double fB     = eq.a * B.x + eq.b * B.y + c_ad;
+    const double fC     = eq.a * C.x + eq.b * C.y + c_ad;
+    const double norm   = std::sqrt(eq.a * eq.a + eq.b * eq.b);
+    const double dB     = std::fabs(fB) / norm;
+    const double dC     = std::fabs(fC) / norm;
+
+    // B and C on same side of AD?
+    const bool same_side = (dB < 1e-12 || dC < 1e-12) ? true : (fB * fC > 0.0);
+
+    // Fig 6c tie-breaker: prefer the nearer of B and C as anchor segment.
+    bool use_ab;
+    if (same_side) {
+        if (std::fabs(dB - dC) < 1e-12 * std::max(1.0, dB + dC))
+            use_ab = (dB <= dC + 1e-15);
+        else
+            use_ab = (dB > dC);
+    } else {
+        const double fE_on_ad = -(eq.c - c_ad);
+        use_ab = (fB * fE_on_ad > 0.0);
     }
+
+    Point result;
+    if (use_ab) {
+        if (intersect_line_e_with_segment(eq, A, B, result)) return result;
+        if (intersect_line_e_with_segment(eq, C, D, result)) return result;
+        return B;
+    } else {
+        if (intersect_line_e_with_segment(eq, C, D, result)) return result;
+        if (intersect_line_e_with_segment(eq, A, B, result)) return result;
+        return C;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Areal displacement: area between polyline A-B-C-D and polyline A-E-D.
+// Uses fixed-size stack arrays — zero heap allocation.
+// ---------------------------------------------------------------------------
+inline double shoelace_area(const Point* pts, int n) {
     double area = 0.0;
-    for (std::size_t i = 0; i < ring.size(); ++i) {
-        const Point& p = ring[i];
-        const Point& q = ring[(i + 1) % ring.size()];
-        area += cross(p, q);
+    for (int i = 0; i < n; ++i) {
+        const int j = (i + 1) % n;
+        area += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
     }
     return 0.5 * area;
 }
 
-// Standard orientation predicate used for segment-intersection tests.
-inline double orientation(const Point& a, const Point& b, const Point& c) {
-    return cross(a, b, c);
-}
+inline double compute_displacement(const Point& A, const Point& B,
+                                   const Point& C, const Point& D,
+                                   const Point& E) {
+    // Intersections between the two chains A-B-C-D and A-E-D.
+    struct XPt { double gp1, gp2; Point pt; };
+    XPt xpts[16];
+    int nxp = 0;
 
-// Returns true when p lies on the closed segment ab, within tolerance.
-inline bool on_segment(const Point& a, const Point& b, const Point& p, double eps = kEpsilon) {
-    if (std::abs(orientation(a, b, p)) > eps) {
-        return false;
+    Point segs[5][2] = {{A,B},{B,C},{C,D},{A,E},{E,D}};
+    const int pairs[4][2] = {{0,4},{1,3},{1,4},{2,3}};
+    for (int p = 0; p < 4; ++p) {
+        const int i = pairs[p][0], j = pairs[p][1];
+        const double dx1 = segs[i][1].x - segs[i][0].x;
+        const double dy1 = segs[i][1].y - segs[i][0].y;
+        const double dx2 = segs[j][1].x - segs[j][0].x;
+        const double dy2 = segs[j][1].y - segs[j][0].y;
+        const double denom = dx1 * dy2 - dy1 * dx2;
+        if (std::fabs(denom) < 1e-20) continue;
+        const double dx3 = segs[j][0].x - segs[i][0].x;
+        const double dy3 = segs[j][0].y - segs[i][0].y;
+        const double t = (dx3 * dy2 - dy3 * dx2) / denom;
+        const double u = (dx3 * dy1 - dy3 * dx1) / denom;
+        if (t > 1e-12 && t < 1.0 - 1e-12 && u > 1e-12 && u < 1.0 - 1e-12)
+            xpts[nxp++] = {static_cast<double>(i) + t,
+                           static_cast<double>(j - 3) + u,
+                           {segs[i][0].x + t * dx1, segs[i][0].y + t * dy1}};
     }
-    return p.x <= std::max(a.x, b.x) + eps && p.x + eps >= std::min(a.x, b.x) &&
-           p.y <= std::max(a.y, b.y) + eps && p.y + eps >= std::min(a.y, b.y);
-}
 
-// General-purpose segment intersection test that accepts both proper crossings
-// and endpoint/collinear touches.
-inline bool segments_intersect(const Segment& s1, const Segment& s2, double eps = kEpsilon) {
-    const double o1 = orientation(s1.a, s1.b, s2.a);
-    const double o2 = orientation(s1.a, s1.b, s2.b);
-    const double o3 = orientation(s2.a, s2.b, s1.a);
-    const double o4 = orientation(s2.a, s2.b, s1.b);
+    // Endpoint-on-segment degenerate cases.
+    auto pt_on_seg = [](const Point& P, const Point& S0, const Point& S1, double& t) -> bool {
+        const double dx = S1.x - S0.x, dy = S1.y - S0.y;
+        const double len2 = dx * dx + dy * dy;
+        if (len2 < 1e-30) return false;
+        t = ((P.x - S0.x) * dx + (P.y - S0.y) * dy) / len2;
+        if (t < 1e-9 || t > 1.0 - 1e-9) return false;
+        const double cx = (P.x - S0.x) * dy - (P.y - S0.y) * dx;
+        return std::fabs(cx) < std::sqrt(len2) * 1e-9;
+    };
+    double tv;
+    if (pt_on_seg(B, A, E, tv)) xpts[nxp++] = {1.0,       tv,       B};
+    if (pt_on_seg(B, E, D, tv)) xpts[nxp++] = {1.0,       1.0 + tv, B};
+    if (pt_on_seg(C, A, E, tv)) xpts[nxp++] = {2.0,       tv,       C};
+    if (pt_on_seg(C, E, D, tv)) xpts[nxp++] = {2.0,       1.0 + tv, C};
+    if (pt_on_seg(E, A, B, tv)) xpts[nxp++] = {tv,        1.0,      E};
+    if (pt_on_seg(E, B, C, tv)) xpts[nxp++] = {1.0 + tv,  1.0,      E};
+    if (pt_on_seg(E, C, D, tv)) xpts[nxp++] = {2.0 + tv,  1.0,      E};
 
-    const bool proper = ((o1 > eps && o2 < -eps) || (o1 < -eps && o2 > eps)) &&
-                        ((o3 > eps && o4 < -eps) || (o3 < -eps && o4 > eps));
-    if (proper) {
-        return true;
+    // Build ordered chains.
+    struct OPt { double gp; Point pt; };
+    OPt chain1[20], chain2[20];
+    int n1 = 0, n2 = 0;
+    chain1[n1++] = {0.0, A}; chain1[n1++] = {1.0, B};
+    chain1[n1++] = {2.0, C}; chain1[n1++] = {3.0, D};
+    chain2[n2++] = {0.0, A}; chain2[n2++] = {1.0, E}; chain2[n2++] = {2.0, D};
+    for (int i = 0; i < nxp; ++i) {
+        chain1[n1++] = {xpts[i].gp1, xpts[i].pt};
+        chain2[n2++] = {xpts[i].gp2, xpts[i].pt};
     }
+    auto cmp = [](const OPt& a, const OPt& b) { return a.gp < b.gp; };
+    std::sort(chain1, chain1 + n1, cmp);
+    std::sort(chain2, chain2 + n2, cmp);
 
-    if (std::abs(o1) <= eps && on_segment(s1.a, s1.b, s2.a, eps)) return true;
-    if (std::abs(o2) <= eps && on_segment(s1.a, s1.b, s2.b, eps)) return true;
-    if (std::abs(o3) <= eps && on_segment(s2.a, s2.b, s1.a, eps)) return true;
-    if (std::abs(o4) <= eps && on_segment(s2.a, s2.b, s1.b, eps)) return true;
-    return false;
-}
+    auto dedup = [](OPt* arr, int& n) {
+        int j = 0;
+        for (int i = 0; i < n; ++i)
+            if (j == 0 || std::fabs(arr[i].gp - arr[j-1].gp) > 1e-15)
+                arr[j++] = arr[i];
+        n = j;
+    };
+    dedup(chain1, n1);
+    dedup(chain2, n2);
 
-// Computes the intersection of two infinite lines given by point pairs.
-inline std::optional<Point> line_intersection(const Point& p1, const Point& p2, const Point& q1, const Point& q2) {
-    const Point r = p2 - p1;
-    const Point s = q2 - q1;
-    const double denom = cross(r, s);
-    if (std::abs(denom) <= kEpsilon) {
-        return std::nullopt;
+    // Shared boundary points.
+    struct SharedPoints { int i1, i2; };
+    SharedPoints shared[20];
+    int nsh = 0;
+    shared[nsh++] = {0, 0};
+    for (int x = 0; x < nxp; ++x) {
+        int i1 = -1, i2 = -1;
+        for (int k = 0; k < n1; ++k)
+            if (std::fabs(chain1[k].gp - xpts[x].gp1) < 1e-12) { i1 = k; break; }
+        for (int k = 0; k < n2; ++k)
+            if (std::fabs(chain2[k].gp - xpts[x].gp2) < 1e-12) { i2 = k; break; }
+        if (i1 >= 0 && i2 >= 0) shared[nsh++] = {i1, i2};
     }
-    const double t = cross(q1 - p1, s) / denom;
-    return p1 + r * t;
-}
+    shared[nsh++] = {n1 - 1, n2 - 1};
+    std::sort(shared, shared + nsh, [](const SharedPoints& a, const SharedPoints& b) { return a.i1 < b.i1; });
+    { int j = 0; for (int i = 0; i < nsh; ++i) { if (j==0||shared[i].i1!=shared[j-1].i1) shared[j++]=shared[i]; } nsh=j; }
 
-// Computes the intersection of two infinite lines in ax + by + c = 0 form.
-inline std::optional<Point> line_intersection(const Line& l1, const Line& l2) {
-    const double det = l1.a * l2.b - l2.a * l1.b;
-    if (std::abs(det) <= kEpsilon) {
-        return std::nullopt;
+    double total = 0.0;
+    for (int s = 0; s + 1 < nsh; ++s) {
+        Point sub[20];
+        int ns = 0;
+        for (int k = shared[s].i1; k <= shared[s+1].i1; ++k) sub[ns++] = chain1[k].pt;
+        for (int k = shared[s+1].i2 - 1; k > shared[s].i2; --k) sub[ns++] = chain2[k].pt;
+        if (ns >= 3) total += std::fabs(shoelace_area(sub, ns));
     }
-    const double x = (l2.c * l1.b - l1.c * l2.b) / det;
-    const double y = (l1.c * l2.a - l2.c * l1.a) / det;
-    return Point{x, y};
-}
-
-// Builds the implicit line representation passing through p and q.
-inline Line through_points(const Point& p, const Point& q) {
-    return {p.y - q.y, q.x - p.x, p.x * q.y - p.y * q.x};
-}
-
-// Returns the signed perpendicular distance from p to the directed line a->b.
-inline double point_line_signed_distance(const Point& p, const Point& a, const Point& b) {
-    const Point ab = b - a;
-    const double len = length(ab);
-    if (len <= kEpsilon) {
-        return 0.0;
-    }
-    return cross(ab, p - a) / len;
-}
-
-// Rotates/translates p into a local frame whose origin is `origin` and whose
-// x-axis is aligned with a caller-supplied angle.
-inline Point rotate_into_frame(const Point& p, const Point& origin, double cos_theta, double sin_theta) {
-    const double dx = p.x - origin.x;
-    const double dy = p.y - origin.y;
-    return {dx * cos_theta + dy * sin_theta, -dx * sin_theta + dy * cos_theta};
+    return total;
 }
 
 }  // namespace simplify
