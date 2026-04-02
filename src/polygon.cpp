@@ -524,5 +524,61 @@ double compute_total_areal_displacement(const std::vector<OutputRing>& original,
     return displacement;
 }
 
+// Main simplification routine: initialize all local candidates, repeatedly pop
+// the best valid collapse from the priority queue, and update nearby windows.
+ProgramOutput simplify_polygon(PolygonData& polygon, std::size_t target_vertices) {
+    const auto original = clone_original(polygon);
+    const double input_area = compute_total_signed_area(original);
+    double cumulative_displacement = 0.0;
+
+    std::priority_queue<Candidate, std::vector<Candidate>, CandidateCompare> queue;
+    for (const Ring& ring : polygon.rings) {
+        if (ring.size < 4) {
+            continue;
+        }
+        Vertex* current = ring.head;
+        for (std::size_t i = 0; i < ring.size; ++i) {
+            if (auto candidate = make_candidate(current)) {
+                queue.push(*candidate);
+            }
+            current = current->next;
+        }
+    }
+
+    while (polygon.total_vertices > target_vertices && !queue.empty()) {
+        Candidate candidate = queue.top();
+        queue.pop();
+        if (!candidate_is_current(candidate)) {
+            continue;
+        }
+
+        Ring& ring = polygon.rings[candidate.b->ring_id];
+        if (ring.size <= 3) {
+            continue;
+        }
+        if (!topology_ok(polygon, candidate)) {
+            continue;
+        }
+
+        Vertex* predecessor = candidate.a->prev;
+        Vertex* successor = candidate.d;
+        collapse_candidate(polygon, ring, candidate, cumulative_displacement);
+
+        for (Vertex* start : {predecessor, candidate.a, successor, successor->next}) {
+            if (start && start->alive) {
+                if (auto updated = make_candidate(start)) {
+                    queue.push(*updated);
+                }
+            }
+        }
+    }
+
+    auto simplified = export_rings(polygon);
+    const double output_area = compute_total_signed_area(simplified);
+    const double final_displacement = compute_total_areal_displacement(original, simplified);
+
+    const double reported_displacement = 2.0 * (final_displacement > 0.0 ? final_displacement : cumulative_displacement);
+    return {simplified, input_area, output_area, reported_displacement};
+}
 
 } // namespace simplify
