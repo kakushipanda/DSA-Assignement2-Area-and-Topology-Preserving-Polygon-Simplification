@@ -358,9 +358,171 @@ std::optional<Point> segment_intersection_point(const Segment& s1, const Segment
     }
     return line_intersection(s1.a, s1.b, s2.a, s2.b);
 }
-
-
-
-
     } // namespace
+
+// Reads the CSV vertex list and constructs one circular doubly-linked list per
+// ring, preserving the input vertex order within each ring.
+PolygonData read_polygon_csv(const std::string& path) {
+    std::ifstream input(path);
+    if (!input) {
+        throw std::runtime_error("Unable to open input file: " + path);
+    }
+
+    std::string line;
+    if (!std::getline(input, line)) {
+        throw std::runtime_error("Input file is empty: " + path);
+    }
+
+    std::unordered_map<int, std::vector<std::pair<int, Point>>> grouped;
+    while (std::getline(input, line)) {
+        if (line.empty()) {
+            continue;
+        }
+        std::stringstream ss(line);
+        std::string cell;
+        std::vector<std::string> cells;
+        while (std::getline(ss, cell, ',')) {
+            cells.push_back(cell);
+        }
+        if (cells.size() != 4) {
+            throw std::runtime_error("Malformed CSV row: " + line);
+        }
+        const int ring_id = std::stoi(cells[0]);
+        const int vertex_id = std::stoi(cells[1]);
+        const double x = std::stod(cells[2]);
+        const double y = std::stod(cells[3]);
+        grouped[ring_id].push_back({vertex_id, {x, y}});
+    }
+
+    PolygonData polygon;
+    std::vector<int> ring_ids;
+    for (const auto& [ring_id, _] : grouped) {
+        ring_ids.push_back(ring_id);
+    }
+    std::sort(ring_ids.begin(), ring_ids.end());
+
+    for (int ring_id : ring_ids) {
+        auto& entries = grouped[ring_id];
+        std::sort(entries.begin(), entries.end(), [](const auto& lhs, const auto& rhs) {
+            return lhs.first < rhs.first;
+        });
+        Ring ring;
+        ring.ring_id = ring_id;
+        std::vector<Vertex*> ring_vertices;
+        for (const auto& [_, point] : entries) {
+            Vertex* vertex = create_vertex(polygon, ring_id, point);
+            ring_vertices.push_back(vertex);
+        }
+        const std::size_t count = ring_vertices.size();
+        for (std::size_t i = 0; i < count; ++i) {
+            ring_vertices[i]->prev = ring_vertices[(i + count - 1) % count];
+            ring_vertices[i]->next = ring_vertices[(i + 1) % count];
+        }
+        ring.head = ring_vertices.front();
+        ring.size = count;
+        polygon.total_vertices += count;
+        polygon.rings.push_back(ring);
+    }
+
+    return polygon;
+}
+
+// Exports the current linked-list polygon into plain output vectors.
+std::vector<OutputRing> export_rings(const PolygonData& polygon) {
+    std::vector<OutputRing> result;
+    result.reserve(polygon.rings.size());
+    for (const Ring& ring : polygon.rings) {
+        result.push_back({ring.ring_id, ring_to_points(ring)});
+    }
+    return result;
+}
+
+// Sums the signed area of every exported ring.
+double compute_total_signed_area(const std::vector<OutputRing>& rings) {
+    double area = 0.0;
+    for (const auto& ring : rings) {
+        area += signed_ring_area(ring.vertices);
+    }
+    return area;
+}
+
+// Estimates total areal displacement by slicing both polygons with vertical
+// cross-sections and summing the interval differences.
+double compute_total_areal_displacement(const std::vector<OutputRing>& original,
+                                        const std::vector<OutputRing>& simplified) {
+    double displacement = 0.0;
+    const std::size_t count = std::min(original.size(), simplified.size());
+    for (std::size_t index = 0; index < count; ++index) {
+        const auto& source = original[index].vertices;
+        const auto& target = simplified[index].vertices;
+        if (source.empty() || target.empty()) {
+            continue;
+        }
+
+        std::vector<Point> source_closed = source;
+        std::vector<Point> target_closed = target;
+        source_closed.push_back(source.front());
+        target_closed.push_back(target.front());
+
+        std::vector<double> xs;
+        for (const auto& p : source) xs.push_back(p.x);
+        for (const auto& p : target) xs.push_back(p.x);
+        for (std::size_t i = 0; i + 1 < source_closed.size(); ++i) {
+            Segment s1{source_closed[i], source_closed[i + 1]};
+            for (std::size_t j = 0; j + 1 < target_closed.size(); ++j) {
+                Segment s2{target_closed[j], target_closed[j + 1]};
+                if (const auto inter = segment_intersection_point(s1, s2)) {
+                    xs.push_back(inter->x);
+                }
+            }
+        }
+        std::sort(xs.begin(), xs.end());
+        xs.erase(std::unique(xs.begin(), xs.end(), [](double lhs, double rhs) {
+                     return std::abs(lhs - rhs) <= kEpsilon;
+                 }),
+                 xs.end());
+
+        auto edge_ys = [](const std::vector<Point>& ring, double x) {
+            std::vector<double> ys;
+            for (std::size_t i = 0; i < ring.size(); ++i) {
+                const Point& p = ring[i];
+                const Point& q = ring[(i + 1) % ring.size()];
+                if (std::abs(p.x - q.x) <= kEpsilon) {
+                    continue;
+                }
+                const double min_x = std::min(p.x, q.x);
+                const double max_x = std::max(p.x, q.x);
+                if (x + kEpsilon < min_x || x - kEpsilon > max_x) {
+                    continue;
+                }
+                const double t = (x - p.x) / (q.x - p.x);
+                ys.push_back(p.y + (q.y - p.y) * t);
+            }
+            std::sort(ys.begin(), ys.end());
+            return ys;
+        };
+
+        for (std::size_t i = 0; i + 1 < xs.size(); ++i) {
+            const double x0 = xs[i];
+            const double x1 = xs[i + 1];
+            if (x1 - x0 <= kEpsilon) {
+                continue;
+            }
+            const double mid = 0.5 * (x0 + x1);
+            auto source_ys = edge_ys(source, mid);
+            auto target_ys = edge_ys(target, mid);
+            const std::size_t pair_count = std::min(source_ys.size(), target_ys.size()) / 2;
+            for (std::size_t pair = 0; pair < pair_count; ++pair) {
+                const double sy0 = source_ys[2 * pair];
+                const double sy1 = source_ys[2 * pair + 1];
+                const double ty0 = target_ys[2 * pair];
+                const double ty1 = target_ys[2 * pair + 1];
+                displacement += (std::abs(sy0 - ty0) + std::abs(sy1 - ty1)) * 0.5 * (x1 - x0);
+            }
+        }
+    }
+    return displacement;
+}
+
+
 } // namespace simplify
