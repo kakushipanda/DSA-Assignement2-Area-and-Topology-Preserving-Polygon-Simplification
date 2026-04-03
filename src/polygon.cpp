@@ -50,30 +50,27 @@ void SpatialGrid::add_edge(const std::vector<Vertex>& pool, int vi) {
 
     const Point& a = pool[static_cast<std::size_t>(vi)].pt;
     const Point& b = pool[static_cast<std::size_t>(nxt)].pt;
-    const int x0 = to_grid(std::min(a.x, b.x));
-    const int x1 = to_grid(std::max(a.x, b.x));
-    const int y0 = to_grid(std::min(a.y, b.y));
-    const int y1 = to_grid(std::max(a.y, b.y));
-    for (int ix = x0; ix <= x1; ++ix)
-        for (int iy = y0; iy <= y1; ++iy)
-            cells[cell_key(ix, iy)].push_back(vi);
+
+    traverse_cells(a, b, [&](int64_t key) -> bool {
+        cells[key].push_back(vi);
+        return false;
+    });
 }
 
 void SpatialGrid::remove_edge(int vi, const Point& a, const Point& b) {
-    const int x0 = to_grid(std::min(a.x, b.x));
-    const int x1 = to_grid(std::max(a.x, b.x));
-    const int y0 = to_grid(std::min(a.y, b.y));
-    const int y1 = to_grid(std::max(a.y, b.y));
-    for (int ix = x0; ix <= x1; ++ix) {
-        for (int iy = y0; iy <= y1; ++iy) {
-            auto it = cells.find(cell_key(ix, iy));
-            if (it == cells.end()) continue;
-            auto& v = it->second;
-            for (int k = static_cast<int>(v.size()) - 1; k >= 0; --k) {
-                if (v[k] == vi) { v[k] = v.back(); v.pop_back(); break; }
+    traverse_cells(a, b, [&](int64_t key) -> bool {
+        auto it = cells.find(key);
+        if (it == cells.end()) return false;
+        auto& v = it->second;
+        for (int k = static_cast<int>(v.size()) - 1; k >= 0; --k) {
+            if (v[static_cast<std::size_t>(k)] == vi) {
+                v[static_cast<std::size_t>(k)] = v.back();
+                v.pop_back();
+                break;
             }
         }
-    }
+        return false;
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -157,15 +154,23 @@ double compute_total_signed_area() {
 // ---------------------------------------------------------------------------
 // Intersection check via grid
 // ---------------------------------------------------------------------------
-static bool seg_intersects_any(const Point& P, const Point& Q,
-                                int exA, int exB, int exC, int exD) {
+static bool is_excluded_edge(int vi, int nxt, const int* ex, int ex_count) {
+    for (int i = 0; i < ex_count; ++i) {
+        const int e = ex[i];
+        if (e < 0) continue;
+        if (vi == e || nxt == e) return true;
+    }
+    return false;
+}
+
+static bool seg_intersects_any_ex(const Point& P, const Point& Q,
+                                 const int* ex, int ex_count) {
     bool found = false;
     glb_grid.query_for_each(P, Q, [&](int vi) -> bool {
         if (!glb_pool[static_cast<std::size_t>(vi)].alive) return false;
         const int nxt = glb_pool[static_cast<std::size_t>(vi)].next;
-        if (vi == exA || vi == exB || vi == exC || vi == exD ||
-            nxt == exA || nxt == exB || nxt == exC || nxt == exD)
-            return false;
+        if (is_excluded_edge(vi, nxt, ex, ex_count)) return false;
+        if (nxt < 0 || static_cast<std::size_t>(nxt) >= glb_pool.size()) return false;
         if (!glb_pool[static_cast<std::size_t>(nxt)].alive) return false;
         if (segments_properly_intersect(P, Q,
                 glb_pool[static_cast<std::size_t>(vi)].pt,
@@ -176,6 +181,12 @@ static bool seg_intersects_any(const Point& P, const Point& Q,
         return false;
     });
     return found;
+}
+
+static bool seg_intersects_any(const Point& P, const Point& Q,
+                               int exA, int exB, int exC, int exD) {
+    const int ex[4] = {exA, exB, exC, exD};
+    return seg_intersects_any_ex(P, Q, ex, 4);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,23 +227,123 @@ double simplify_polygon(int target_vertices) {
     // ------------------------------------------------------------------
     int seq_counter = 0;
     auto make_collapse = [&](int ai, int bi, int ci, int di) -> Collapse {
+        const double penalty = std::numeric_limits<double>::max();
+
         Collapse col;
         col.A = ai; col.B = bi; col.C = ci; col.D = di;
         col.vA = glb_pool[static_cast<std::size_t>(ai)].version;
         col.vB = glb_pool[static_cast<std::size_t>(bi)].version;
         col.vC = glb_pool[static_cast<std::size_t>(ci)].version;
         col.vD = glb_pool[static_cast<std::size_t>(di)].version;
-        col.E  = compute_replacement_point(
-                     glb_pool[static_cast<std::size_t>(ai)].pt,
-                     glb_pool[static_cast<std::size_t>(bi)].pt,
-                     glb_pool[static_cast<std::size_t>(ci)].pt,
-                     glb_pool[static_cast<std::size_t>(di)].pt);
-        col.displacement = compute_displacement(
-                     glb_pool[static_cast<std::size_t>(ai)].pt,
-                     glb_pool[static_cast<std::size_t>(bi)].pt,
-                     glb_pool[static_cast<std::size_t>(ci)].pt,
-                     glb_pool[static_cast<std::size_t>(di)].pt,
-                     col.E);
+
+        const Point& pA = glb_pool[static_cast<std::size_t>(ai)].pt;
+        const Point& pB = glb_pool[static_cast<std::size_t>(bi)].pt;
+        const Point& pC = glb_pool[static_cast<std::size_t>(ci)].pt;
+        const Point& pD = glb_pool[static_cast<std::size_t>(di)].pt;
+
+        col.E  = compute_replacement_point(pA, pB, pC, pD);
+        col.displacement = compute_displacement(pA, pB, pC, pD, col.E);
+
+        const int ring_idx = glb_pool[static_cast<std::size_t>(bi)].ring_idx;
+        const int ring_size = (ring_idx >= 0 && static_cast<std::size_t>(ring_idx) < glb_rings.size())
+            ? glb_rings[static_cast<std::size_t>(ring_idx)].size
+            : 0;
+
+        auto future_disp_left = [&]() -> double {
+            if (ring_size <= 4) return penalty;
+
+            const int prev_a = glb_pool[static_cast<std::size_t>(ai)].prev;
+            if (prev_a < 0) return penalty;
+            if (!glb_pool[static_cast<std::size_t>(prev_a)].alive) return penalty;
+            if (glb_pool[static_cast<std::size_t>(prev_a)].ring_idx != ring_idx) return penalty;
+
+            if (prev_a == ai || prev_a == bi || prev_a == ci || prev_a == di) return penalty;
+
+            const Point& pP = glb_pool[static_cast<std::size_t>(prev_a)].pt;
+            const Point& pA2 = pA;
+            const Point& pE2 = col.E;
+            const Point& pD2 = pD;
+
+            const Point E2 = compute_replacement_point(pP, pA2, pE2, pD2);
+            const double disp2 = compute_displacement(pP, pA2, pE2, pD2, E2);
+
+            const int prev_p = glb_pool[static_cast<std::size_t>(prev_a)].prev;
+            const int next_d = glb_pool[static_cast<std::size_t>(di)].next;
+
+            int ex1[8];
+            int ex1n = 0;
+            ex1[ex1n++] = prev_p;
+            ex1[ex1n++] = prev_a;
+            ex1[ex1n++] = ai;
+            ex1[ex1n++] = bi;
+            ex1[ex1n++] = ci;
+            ex1[ex1n++] = di;
+            if (seg_intersects_any_ex(pP, E2, ex1, ex1n)) return penalty;
+
+            int ex2[8];
+            int ex2n = 0;
+            ex2[ex2n++] = ai;
+            ex2[ex2n++] = bi;
+            ex2[ex2n++] = ci;
+            ex2[ex2n++] = di;
+            ex2[ex2n++] = next_d;
+            if (seg_intersects_any_ex(E2, pD2, ex2, ex2n)) return penalty;
+
+            return disp2;
+        };
+
+        auto future_disp_right = [&]() -> double {
+            if (ring_size <= 4) return penalty;
+
+            const int next_d = glb_pool[static_cast<std::size_t>(di)].next;
+            if (next_d < 0) return penalty;
+            if (!glb_pool[static_cast<std::size_t>(next_d)].alive) return penalty;
+            if (glb_pool[static_cast<std::size_t>(next_d)].ring_idx != ring_idx) return penalty;
+
+            if (next_d == ai || next_d == bi || next_d == ci || next_d == di) return penalty;
+
+            const Point& pN = glb_pool[static_cast<std::size_t>(next_d)].pt;
+            const Point& pA2 = pA;
+            const Point& pE2 = col.E;
+            const Point& pD2 = pD;
+
+            const Point E2 = compute_replacement_point(pA2, pE2, pD2, pN);
+            const double disp2 = compute_displacement(pA2, pE2, pD2, pN, E2);
+
+            const int prev_a = glb_pool[static_cast<std::size_t>(ai)].prev;
+            const int next_n = glb_pool[static_cast<std::size_t>(next_d)].next;
+
+            int ex1[8];
+            int ex1n = 0;
+            ex1[ex1n++] = prev_a;
+            ex1[ex1n++] = ai;
+            ex1[ex1n++] = bi;
+            ex1[ex1n++] = ci;
+            ex1[ex1n++] = di;
+            if (seg_intersects_any_ex(pA2, E2, ex1, ex1n)) return penalty;
+
+            int ex2[8];
+            int ex2n = 0;
+            ex2[ex2n++] = bi;
+            ex2[ex2n++] = ci;
+            ex2[ex2n++] = di;
+            ex2[ex2n++] = next_d;
+            ex2[ex2n++] = next_n;
+            if (seg_intersects_any_ex(E2, pN, ex2, ex2n)) return penalty;
+
+            return disp2;
+        };
+
+        const double left = future_disp_left();
+        const double right = future_disp_right();
+        const double best_future = (left < right) ? left : right;
+
+        if (best_future == penalty || col.displacement == penalty) {
+            col.total_cost = penalty;
+        } else {
+            col.total_cost = col.displacement + (0.5 * best_future);
+        }
+
         col.seq_id = seq_counter++;
         return col;
     };

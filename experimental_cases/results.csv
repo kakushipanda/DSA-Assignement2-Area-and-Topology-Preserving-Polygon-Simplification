@@ -1,94 +1,95 @@
-# benchmark.cpp results,,,,,,,
-# timestamp_utc=2026-04-03T10:02:07Z,,,,,,,
-# os=Linux,,,,,,,
-# hw_threads=28,,,,,,,
-# input_dir=./experimental_cases,,,,,,,
-# iters=5, warmup=1, jobs=1,,,,,
-# targets=49.00,22,15,7,,,,
+# benchmark.cpp results
+# timestamp_utc=2026-04-03T10:26:19Z
+# os=Linux
+# hw_threads=28
+# input_dir=./experimental_cases
+# iters=5, warmup=1, jobs=1
+# targets=49.00,22.00,15.00,7.00
 Filename,Original_Vertices,Target_Vertices,Target_Percentage,Execution_Time_MS,Peak_Memory_KB,Areal_Displacement,Std_Deviation_MS
-./experimental_cases/input_axis_aligned_square.csv,4,2,49,0.017,0,2.00E+02,0.002
-./experimental_cases/input_axis_aligned_square.csv,4,1,22,0.016,0,2.00E+02,0.001
-./experimental_cases/input_axis_aligned_square.csv,4,1,15,0.015,0,2.00E+02,0.001
-./experimental_cases/input_axis_aligned_square.csv,4,1,7,0.015,0,2.00E+02,0.001
-./experimental_cases/input_concave_notch_10.csv,10,5,49,0.038,0,9.00E+02,0.002
-./experimental_cases/input_concave_notch_10.csv,10,2,22,0.049,0,1.24E+03,0.003
-./experimental_cases/input_concave_notch_10.csv,10,2,15,0.051,0,1.24E+03,0.01
-./experimental_cases/input_concave_notch_10.csv,10,1,7,0.044,0,1.24E+03,0.005
-./experimental_cases/input_dual_hole_narrow_gap.csv,12,6,49,0.027,0,1.65E+03,0.006
-./experimental_cases/input_dual_hole_narrow_gap.csv,12,3,22,0.026,0,1.65E+03,0.001
-./experimental_cases/input_dual_hole_narrow_gap.csv,12,2,15,0.032,0,1.65E+03,0.014
-./experimental_cases/input_dual_hole_narrow_gap.csv,12,1,7,0.032,0,1.65E+03,0.011
-./experimental_cases/input_eight_holes_field.csv,28,14,49,0.08,0,5.00E+03,0.005
-./experimental_cases/input_eight_holes_field.csv,28,6,22,0.084,0,5.00E+03,0.004
-./experimental_cases/input_eight_holes_field.csv,28,4,15,0.098,0,5.00E+03,0.037
-./experimental_cases/input_eight_holes_field.csv,28,2,7,0.084,0,5.00E+03,0.005
-./experimental_cases/input_four_holes_compact.csv,16,8,49,0.049,0,8.00E+02,0.006
-./experimental_cases/input_four_holes_compact.csv,16,4,22,0.053,0,8.00E+02,0.001
-./experimental_cases/input_four_holes_compact.csv,16,2,15,0.051,0,8.00E+02,0.003
-./experimental_cases/input_four_holes_compact.csv,16,1,7,0.05,0,8.00E+02,0.005
-./experimental_cases/input_large_with_hole.csv,8,4,49,0.033,0,5.20E+13,0.002
-./experimental_cases/input_large_with_hole.csv,8,2,22,0.035,0,5.20E+13,0
-./experimental_cases/input_large_with_hole.csv,8,1,15,0.034,0,5.20E+13,0.002
-./experimental_cases/input_large_with_hole.csv,8,1,7,0.032,0,5.20E+13,0.004
-./experimental_cases/input_minimal_triangle.csv,3,1,49,0.004,0,0.00E+00,0
-./experimental_cases/input_minimal_triangle.csv,3,1,22,0.005,0,0.00E+00,0
-./experimental_cases/input_minimal_triangle.csv,3,1,15,0.005,0,0.00E+00,0
-./experimental_cases/input_minimal_triangle.csv,3,1,7,0.004,0,0.00E+00,0
-./experimental_cases/input_narrow_corridor.csv,8,4,49,0.02,0,6.86E+02,0.01
-./experimental_cases/input_narrow_corridor.csv,8,2,22,0.019,0,8.77E+02,0.001
-./experimental_cases/input_narrow_corridor.csv,8,1,15,0.017,0,8.77E+02,0.003
-./experimental_cases/input_narrow_corridor.csv,8,1,7,0.019,0,8.77E+02,0.001
-./experimental_cases/input_near_collinear_large.csv,5,2,49,0.014,0,1.00E+12,0.001
-./experimental_cases/input_near_collinear_large.csv,5,1,22,0.018,0,1.00E+12,0.009
-./experimental_cases/input_near_collinear_large.csv,5,1,15,0.017,0,1.00E+12,0.006
-./experimental_cases/input_near_collinear_large.csv,5,1,7,0.014,0,1.00E+12,0
-./experimental_cases/input_negative_coords_mixed.csv,5,2,49,0.011,0,5.40E+02,0
-./experimental_cases/input_negative_coords_mixed.csv,5,1,22,0.011,0,5.40E+02,0.001
-./experimental_cases/input_negative_coords_mixed.csv,5,1,15,0.011,0,5.40E+02,0
-./experimental_cases/input_negative_coords_mixed.csv,5,1,7,0.011,0,5.40E+02,0.001
-./experimental_cases/input_offset_large_small.csv,8,4,49,0.031,0,1.02E+06,0.009
-./experimental_cases/input_offset_large_small.csv,8,2,22,0.029,0,1.02E+06,0.012
-./experimental_cases/input_offset_large_small.csv,8,1,15,0.023,0,1.02E+06,0.001
-./experimental_cases/input_offset_large_small.csv,8,1,7,0.022,0,1.02E+06,0.001
-./experimental_cases/input_regular128.csv,128,63,49,0.197,0,1.61E+02,0.033
-./experimental_cases/input_regular128.csv,128,28,22,0.248,0,9.44E+02,0.02
-./experimental_cases/input_regular128.csv,128,19,15,0.277,0,2.34E+03,0.055
-./experimental_cases/input_regular128.csv,128,9,7,0.3,0,9.20E+03,0.008
-./experimental_cases/input_regular256.csv,256,125,49,0.261,0,5.96E+01,0.02
-./experimental_cases/input_regular256.csv,256,56,22,0.43,0,3.34E+02,0.085
-./experimental_cases/input_regular256.csv,256,38,15,0.435,0,7.32E+02,0.016
-./experimental_cases/input_regular256.csv,256,18,7,0.516,0,3.33E+03,0.013
-./experimental_cases/input_regular32.csv,32,16,49,0.053,0,4.27E+02,0.006
-./experimental_cases/input_regular32.csv,32,7,22,0.109,0,2.85E+03,0.05
-./experimental_cases/input_regular32.csv,32,5,15,0.126,0,5.45E+03,0.041
-./experimental_cases/input_regular32.csv,32,2,7,0.165,0,2.25E+04,0.005
-./experimental_cases/input_skinny_rectangle_6.csv,6,3,49,0.011,0,3.42E+02,0.001
-./experimental_cases/input_skinny_rectangle_6.csv,6,1,22,0.01,0,3.42E+02,0
-./experimental_cases/input_skinny_rectangle_6.csv,6,1,15,0.01,0,3.42E+02,0.001
-./experimental_cases/input_skinny_rectangle_6.csv,6,1,7,0.009,0,3.42E+02,0.002
-./experimental_cases/input_spike24.csv,24,12,49,0.058,0,7.00E+03,0.004
-./experimental_cases/input_spike24.csv,24,5,22,0.079,0,1.51E+04,0.005
-./experimental_cases/input_spike24.csv,24,4,15,0.084,0,1.61E+04,0.003
-./experimental_cases/input_spike24.csv,24,2,7,0.1,0,2.55E+04,0.011
-./experimental_cases/input_star20.csv,20,10,49,0.048,0,6.77E+03,0.004
-./experimental_cases/input_star20.csv,20,4,22,0.063,0,1.18E+04,0.007
-./experimental_cases/input_star20.csv,20,3,15,0.071,0,1.49E+04,0.001
-./experimental_cases/input_star20.csv,20,1,7,0.072,0,1.49E+04,0.006
-./experimental_cases/input_tiny_hole_clearance.csv,7,3,49,0.039,0,1.25E+03,0.016
-./experimental_cases/input_tiny_hole_clearance.csv,7,2,22,0.027,0,1.25E+03,0.004
-./experimental_cases/input_tiny_hole_clearance.csv,7,1,15,0.029,0,1.25E+03,0.003
-./experimental_cases/input_tiny_hole_clearance.csv,7,1,7,0.029,0,1.25E+03,0.003
-./experimental_cases/input_triangle_hole_minimal.csv,7,3,49,0.026,0,4.50E+02,0.003
-./experimental_cases/input_triangle_hole_minimal.csv,7,2,22,0.026,0,4.50E+02,0.003
-./experimental_cases/input_triangle_hole_minimal.csv,7,1,15,0.03,0,4.50E+02,0.002
-./experimental_cases/input_triangle_hole_minimal.csv,7,1,7,0.026,0,4.50E+02,0.002
-./experimental_cases/input_zigzag40_band.csv,42,21,49,0.069,0,1.98E+03,0.004
-./experimental_cases/input_zigzag40_band.csv,42,9,22,0.092,0,3.39E+03,0.008
-./experimental_cases/input_zigzag40_band.csv,42,6,15,0.092,0,3.80E+03,0.007
-./experimental_cases/input_zigzag40_band.csv,42,3,7,0.107,0,4.11E+03,0.006
-# summary_total_rows=80,,,,,,,
-# summary_ok_rows=80,,,,,,,
-# summary_avg_mean_time_ms=0.071,,,,,,,
-# summary_avg_peak_mem_kb=0.000,,,,,,,
-# summary_avg_areal_displacement=2.6500000121e+12,,,,,,,
-# summary_mem_efficiency_ratio_kb_per_ms=0.000000,,,,,,,
+./experimental_cases/input_axis_aligned_square.csv,4,2,49.00,0.010,0,2.0000000000e+02,0.002
+./experimental_cases/input_axis_aligned_square.csv,4,1,22.00,0.009,0,2.0000000000e+02,0.001
+./experimental_cases/input_axis_aligned_square.csv,4,1,15.00,0.008,0,2.0000000000e+02,0.002
+./experimental_cases/input_axis_aligned_square.csv,4,1,7.00,0.009,0,2.0000000000e+02,0.002
+./experimental_cases/input_concave_notch_10.csv,10,5,49.00,0.056,0,1.0000000000e+03,0.013
+./experimental_cases/input_concave_notch_10.csv,10,2,22.00,0.065,0,2.6500000000e+03,0.013
+./experimental_cases/input_concave_notch_10.csv,10,2,15.00,0.052,0,2.6500000000e+03,0.005
+./experimental_cases/input_concave_notch_10.csv,10,1,7.00,0.074,0,2.6500000000e+03,0.030
+./experimental_cases/input_dual_hole_narrow_gap.csv,12,6,49.00,0.017,0,1.6480000000e+03,0.001
+./experimental_cases/input_dual_hole_narrow_gap.csv,12,3,22.00,0.014,0,1.6480000000e+03,0.002
+./experimental_cases/input_dual_hole_narrow_gap.csv,12,2,15.00,0.014,0,1.6480000000e+03,0.002
+./experimental_cases/input_dual_hole_narrow_gap.csv,12,1,7.00,0.016,0,1.6480000000e+03,0.002
+./experimental_cases/input_eight_holes_field.csv,28,14,49.00,0.023,0,5.0000000000e+03,0.002
+./experimental_cases/input_eight_holes_field.csv,28,6,22.00,0.044,0,5.0000000000e+03,0.021
+./experimental_cases/input_eight_holes_field.csv,28,4,15.00,0.024,0,5.0000000000e+03,0.002
+./experimental_cases/input_eight_holes_field.csv,28,2,7.00,0.022,0,5.0000000000e+03,0.001
+./experimental_cases/input_four_holes_compact.csv,16,8,49.00,0.027,0,8.0000000000e+02,0.018
+./experimental_cases/input_four_holes_compact.csv,16,4,22.00,0.017,0,8.0000000000e+02,0.002
+./experimental_cases/input_four_holes_compact.csv,16,2,15.00,0.016,0,8.0000000000e+02,0.001
+./experimental_cases/input_four_holes_compact.csv,16,1,7.00,0.016,0,8.0000000000e+02,0.001
+./experimental_cases/input_large_with_hole.csv,8,4,49.00,0.014,0,5.2000000000e+13,0.002
+./experimental_cases/input_large_with_hole.csv,8,2,22.00,0.015,0,5.2000000000e+13,0.002
+./experimental_cases/input_large_with_hole.csv,8,1,15.00,0.016,0,5.2000000000e+13,0.001
+./experimental_cases/input_large_with_hole.csv,8,1,7.00,0.018,0,5.2000000000e+13,0.008
+./experimental_cases/input_minimal_triangle.csv,3,1,49.00,0.004,0,0.0000000000e+00,0.001
+./experimental_cases/input_minimal_triangle.csv,3,1,22.00,0.004,0,0.0000000000e+00,0.001
+./experimental_cases/input_minimal_triangle.csv,3,1,15.00,0.004,0,0.0000000000e+00,0.000
+./experimental_cases/input_minimal_triangle.csv,3,1,7.00,0.004,0,0.0000000000e+00,0.000
+./experimental_cases/input_narrow_corridor.csv,8,4,49.00,0.036,0,6.6236559140e+02,0.003
+./experimental_cases/input_narrow_corridor.csv,8,2,22.00,0.040,0,7.0445254792e+02,0.004
+./experimental_cases/input_narrow_corridor.csv,8,1,15.00,0.043,0,7.0445254792e+02,0.005
+./experimental_cases/input_narrow_corridor.csv,8,1,7.00,0.039,0,7.0445254792e+02,0.003
+./experimental_cases/input_near_collinear_large.csv,5,2,49.00,0.019,0,9.9999916667e+11,0.001
+./experimental_cases/input_near_collinear_large.csv,5,1,22.00,0.014,0,9.9999916667e+11,0.002
+./experimental_cases/input_near_collinear_large.csv,5,1,15.00,0.014,0,9.9999916667e+11,0.003
+./experimental_cases/input_near_collinear_large.csv,5,1,7.00,0.014,0,9.9999916667e+11,0.003
+./experimental_cases/input_negative_coords_mixed.csv,5,2,49.00,0.017,0,7.5027272727e+02,0.006
+./experimental_cases/input_negative_coords_mixed.csv,5,1,22.00,0.023,0,7.5027272727e+02,0.013
+./experimental_cases/input_negative_coords_mixed.csv,5,1,15.00,0.013,0,7.5027272727e+02,0.004
+./experimental_cases/input_negative_coords_mixed.csv,5,1,7.00,0.017,0,7.5027272727e+02,0.002
+./experimental_cases/input_offset_large_small.csv,8,4,49.00,0.018,0,1.0200000000e+06,0.013
+./experimental_cases/input_offset_large_small.csv,8,2,22.00,0.010,0,1.0200000000e+06,0.001
+./experimental_cases/input_offset_large_small.csv,8,1,15.00,0.009,0,1.0200000000e+06,0.001
+./experimental_cases/input_offset_large_small.csv,8,1,7.00,0.010,0,1.0200000000e+06,0.001
+./experimental_cases/input_regular128.csv,128,63,49.00,0.337,0,1.6413081832e+02,0.008
+./experimental_cases/input_regular128.csv,128,28,22.00,0.501,0,1.0162582429e+03,0.007
+./experimental_cases/input_regular128.csv,128,19,15.00,0.575,0,2.2378408443e+03,0.028
+./experimental_cases/input_regular128.csv,128,9,7.00,0.697,0,1.0819247574e+04,0.033
+./experimental_cases/input_regular256.csv,256,125,49.00,0.616,0,6.6169908934e+01,0.049
+./experimental_cases/input_regular256.csv,256,56,22.00,0.921,0,3.3871549559e+02,0.049
+./experimental_cases/input_regular256.csv,256,38,15.00,0.947,0,7.6654181820e+02,0.021
+./experimental_cases/input_regular256.csv,256,18,7.00,1.147,0,3.3049848003e+03,0.069
+./experimental_cases/input_regular32.csv,32,16,49.00,0.099,0,4.7460506923e+02,0.005
+./experimental_cases/input_regular32.csv,32,7,22.00,0.168,0,3.1184187737e+03,0.009
+./experimental_cases/input_regular32.csv,32,5,15.00,0.211,0,5.5587029222e+03,0.044
+./experimental_cases/input_regular32.csv,32,2,7.00,0.215,0,3.0345095120e+04,0.008
+./experimental_cases/input_skinny_rectangle_6.csv,6,3,49.00,0.027,0,2.5333333333e+02,0.014
+./experimental_cases/input_skinny_rectangle_6.csv,6,1,22.00,0.019,0,2.5333333333e+02,0.007
+./experimental_cases/input_skinny_rectangle_6.csv,6,1,15.00,0.025,0,2.5333333333e+02,0.016
+./experimental_cases/input_skinny_rectangle_6.csv,6,1,7.00,0.015,0,2.5333333333e+02,0.004
+./experimental_cases/input_spike24.csv,24,12,49.00,0.089,0,7.8079380190e+03,0.006
+./experimental_cases/input_spike24.csv,24,5,22.00,0.166,0,1.2937939680e+04,0.036
+./experimental_cases/input_spike24.csv,24,4,15.00,0.143,0,1.5980250623e+04,0.008
+./experimental_cases/input_spike24.csv,24,2,7.00,0.139,0,3.9519567524e+04,0.010
+./experimental_cases/input_star20.csv,20,10,49.00,0.138,0,7.2104056786e+03,0.030
+./experimental_cases/input_star20.csv,20,4,22.00,0.169,0,1.4025239803e+04,0.049
+./experimental_cases/input_star20.csv,20,3,15.00,0.134,0,1.7609901358e+04,0.006
+./experimental_cases/input_star20.csv,20,1,7.00,0.155,0,1.7609901358e+04,0.004
+./experimental_cases/input_tiny_hole_clearance.csv,7,3,49.00,0.022,0,1.2500000000e+03,0.025
+./experimental_cases/input_tiny_hole_clearance.csv,7,2,22.00,0.014,0,1.2500000000e+03,0.007
+./experimental_cases/input_tiny_hole_clearance.csv,7,1,15.00,0.012,0,1.2500000000e+03,0.001
+./experimental_cases/input_tiny_hole_clearance.csv,7,1,7.00,0.010,0,1.2500000000e+03,0.001
+./experimental_cases/input_triangle_hole_minimal.csv,7,3,49.00,0.012,0,4.5000000000e+02,0.002
+./experimental_cases/input_triangle_hole_minimal.csv,7,2,22.00,0.012,0,4.5000000000e+02,0.002
+./experimental_cases/input_triangle_hole_minimal.csv,7,1,15.00,0.010,0,4.5000000000e+02,0.001
+./experimental_cases/input_triangle_hole_minimal.csv,7,1,7.00,0.014,0,4.5000000000e+02,0.003
+./experimental_cases/input_zigzag40_band.csv,42,21,49.00,0.107,0,1.1640383598e+03,0.006
+./experimental_cases/input_zigzag40_band.csv,42,9,22.00,0.154,0,2.3764283042e+03,0.006
+./experimental_cases/input_zigzag40_band.csv,42,6,15.00,0.169,0,3.7325349566e+03,0.005
+./experimental_cases/input_zigzag40_band.csv,42,3,7.00,0.191,0,8.8613163816e+03,0.022
+./experimental_cases/results.csv,0,0,0.00,0.000,0,0.0000000000e+00,0.000
+# summary_total_rows=81
+# summary_ok_rows=80
+# summary_avg_mean_time_ms=0.117
+# summary_avg_peak_mem_kb=0.000
+# summary_avg_areal_displacement=2.6500000126e+12
+# summary_mem_efficiency_ratio_kb_per_ms=0.000000

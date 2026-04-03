@@ -11,8 +11,11 @@
 //   per-query deduplication — no std::set or std::unordered_set in the hot path.
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -52,12 +55,11 @@ struct Collapse {
     int    vA = 0, vB = 0, vC = 0, vD = 0;  // version snapshots
     Point  E;                                  // pre-computed replacement point
     double displacement = 0.0;
+    double total_cost   = 0.0;
     int    seq_id       = 0;                   // FIFO tiebreaker
 
-    // Min-heap ordering: smallest displacement first; ties broken by seq_id
-    // (earlier insertion wins — matches APSC paper's FIFO tiebreaker).
     bool operator>(const Collapse& o) const {
-        if (displacement != o.displacement) return displacement > o.displacement;
+        if (total_cost != o.total_cost) return total_cost > o.total_cost;
         return seq_id > o.seq_id;
     }
 };
@@ -94,6 +96,65 @@ struct SpatialGrid {
     // Remove the edge that used to run from vi through old endpoints a→b.
     void remove_edge(int vi, const Point& a, const Point& b);
 
+    template <typename F>
+    bool traverse_cells(const Point& A, const Point& B, F&& func) const {
+        if (inv_cell_size <= 0.0) return false;
+        const double cs = 1.0 / inv_cell_size;
+
+        int ix = to_grid(A.x);
+        int iy = to_grid(A.y);
+        const int ex = to_grid(B.x);
+        const int ey = to_grid(B.y);
+
+        if (func(cell_key(ix, iy))) return true;
+        if (ix == ex && iy == ey) return false;
+
+        const double dx = B.x - A.x;
+        const double dy = B.y - A.y;
+
+        const int step_x = (dx > 0.0) ? 1 : (dx < 0.0) ? -1 : 0;
+        const int step_y = (dy > 0.0) ? 1 : (dy < 0.0) ? -1 : 0;
+
+        const double inf = std::numeric_limits<double>::infinity();
+
+        double t_max_x = inf;
+        double t_max_y = inf;
+        double t_delta_x = inf;
+        double t_delta_y = inf;
+
+        if (step_x != 0) {
+            const double next_x = (step_x > 0) ? (static_cast<double>(ix + 1) * cs)
+                                               : (static_cast<double>(ix) * cs);
+            t_max_x = (next_x - A.x) / dx;
+            t_delta_x = cs / std::abs(dx);
+        }
+
+        if (step_y != 0) {
+            const double next_y = (step_y > 0) ? (static_cast<double>(iy + 1) * cs)
+                                               : (static_cast<double>(iy) * cs);
+            t_max_y = (next_y - A.y) / dy;
+            t_delta_y = cs / std::abs(dy);
+        }
+
+        const int max_steps = std::abs(ex - ix) + std::abs(ey - iy) + 4;
+        for (int steps = 0; steps < max_steps && !(ix == ex && iy == ey); ++steps) {
+            if (t_max_x < t_max_y) {
+                ix += step_x;
+                t_max_x += t_delta_x;
+            } else if (t_max_y < t_max_x) {
+                iy += step_y;
+                t_max_y += t_delta_y;
+            } else {
+                ix += step_x;
+                iy += step_y;
+                t_max_x += t_delta_x;
+                t_max_y += t_delta_y;
+            }
+            if (func(cell_key(ix, iy))) return true;
+        }
+        return false;
+    }
+
     // Iterate over every unique edge whose bounding box overlaps segment P→Q,
     // calling func(edge_start_index).  func returns true to stop early.
     template <typename F>
@@ -102,23 +163,19 @@ struct SpatialGrid {
             std::fill(query_gen.begin(), query_gen.end(), 0);
             cur_gen = 1;
         }
-        const int x0 = to_grid(std::min(P.x, Q.x));
-        const int x1 = to_grid(std::max(P.x, Q.x));
-        const int y0 = to_grid(std::min(P.y, Q.y));
-        const int y1 = to_grid(std::max(P.y, Q.y));
-        for (int ix = x0; ix <= x1; ++ix) {
-            for (int iy = y0; iy <= y1; ++iy) {
-                auto it = cells.find(cell_key(ix, iy));
-                if (it == cells.end()) continue;
-                for (int vi : it->second) {
-                    if (vi < 0 || static_cast<std::size_t>(vi) >= query_gen.size())
-                        continue;
-                    if (query_gen[vi] == cur_gen) continue;
-                    query_gen[vi] = cur_gen;
-                    if (func(vi)) return;
-                }
+
+        traverse_cells(P, Q, [&](int64_t key) -> bool {
+            auto it = cells.find(key);
+            if (it == cells.end()) return false;
+            for (int vi : it->second) {
+                if (vi < 0 || static_cast<std::size_t>(vi) >= query_gen.size())
+                    continue;
+                if (query_gen[vi] == cur_gen) continue;
+                query_gen[vi] = cur_gen;
+                if (func(vi)) return true;
             }
-        }
+            return false;
+        });
     }
 };
 
