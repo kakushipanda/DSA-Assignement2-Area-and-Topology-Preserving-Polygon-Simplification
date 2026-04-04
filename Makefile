@@ -10,6 +10,8 @@
 #   make test             run test_cases/, write my_output_*.txt, diff vs output_*.txt
 #   make test-extra       run experimental_cases/, write my_output_*.txt, diff vs output_*.txt
 #   make test-all         both of the above
+#   make benchmark        run simplify_benchmark on test_cases/ and experimental_cases/
+#   make evaluate         run Python scaling/displacement analysis
 #   make clean            remove object files, binaries, and all my_output_*.txt files
 
 # ---------------------------------------------------------------------------
@@ -118,7 +120,7 @@ endef
 # ---------------------------------------------------------------------------
 # Build targets
 # ---------------------------------------------------------------------------
-.PHONY: all clean test test-extra test-all evaluate
+.PHONY: all clean test test-extra test-all benchmark evaluate
 
 all: simplify simplify_benchmark area_and_topology_preserving_polygon_simplification
 
@@ -130,7 +132,6 @@ simplify_benchmark: $(OBJ_BENCHMARK)
 
 area_and_topology_preserving_polygon_simplification: simplify
 	cp simplify area_and_topology_preserving_polygon_simplification
-	cp simplify_benchmark benchmark
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -153,7 +154,28 @@ test-all: simplify
 	$(call RUN_SUITE,$(EXTRA_TEST_CASES),Experimental test cases)
 
 # ---------------------------------------------------------------------------
-# Evaluation (unchanged from original)
+# Benchmark target: run simplify_benchmark on real test inputs
+# Outputs a CSV per suite to benchmark/results/
+# ---------------------------------------------------------------------------
+BENCHMARK_RESULTS_DIR := benchmark/results
+
+benchmark: simplify_benchmark
+	@mkdir -p $(BENCHMARK_RESULTS_DIR)
+	@echo ""
+	@echo "=== Benchmarking test_cases/ ==="
+	./simplify_benchmark test_cases/ \
+		--out $(BENCHMARK_RESULTS_DIR)/benchmark_test_cases.csv \
+		--iters 5 --warmup 1 --verbose 1
+	@echo ""
+	@echo "=== Benchmarking experimental_cases/ ==="
+	./simplify_benchmark experimental_cases/ \
+		--out $(BENCHMARK_RESULTS_DIR)/benchmark_experimental_cases.csv \
+		--iters 5 --warmup 1 --verbose 1
+	@echo ""
+	@echo "Benchmark results written to $(BENCHMARK_RESULTS_DIR)/"
+
+# ---------------------------------------------------------------------------
+# Evaluation (Scaling analysis pipeline)
 # ---------------------------------------------------------------------------
 evaluate: simplify
 	python3 scripts/run_experimental_evaluation.py
@@ -164,8 +186,7 @@ evaluate: simplify
 clean:
 	rm -f src/*.o \
 	      simplify \
+	      simplify_benchmark \
 	      area_and_topology_preserving_polygon_simplification \
 	      test_cases/my_output_*.txt \
-	      experimental_cases/my_output_*.txt\
-				simplify_benchmark \
-				benchmark
+	      experimental_cases/my_output_*.txt
