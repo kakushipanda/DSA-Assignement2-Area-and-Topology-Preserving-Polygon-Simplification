@@ -16,6 +16,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -133,27 +134,6 @@ static double stdev_sample(const std::vector<double>& v) {
     return std::sqrt(acc / static_cast<double>(v.size() - 1));
 }
 
-static long long peak_rss_kb() {
-#if defined(__unix__) || defined(__APPLE__)
-    rusage usage{};
-    if (getrusage(RUSAGE_SELF, &usage) != 0) return -1;
-#if defined(__APPLE__)
-    return static_cast<long long>(usage.ru_maxrss / 1024);
-#else
-    return static_cast<long long>(usage.ru_maxrss);
-#endif
-#elif defined(_WIN32)
-    PROCESS_MEMORY_COUNTERS_EX pmc{};
-    if (!GetProcessMemoryInfo(GetCurrentProcess(),
-                              reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc),
-                              sizeof(pmc))) {
-        return -1;
-    }
-    return static_cast<long long>(pmc.PeakWorkingSetSize / 1024);
-#else
-    return -1;
-#endif
-}
 
 static int clamp_target(int original, int target) {
     if (original <= 0) return 0;
@@ -171,7 +151,6 @@ static int pct_target_round(int original, double pct) {
 
 struct RunStats {
     std::vector<double> times_ms;
-    std::vector<long long> peak_kb_delta;
     std::vector<double> displacement;
 };
 
@@ -183,7 +162,6 @@ struct AggregatedRow {
     double mean_time_ms = 0.0;
     double median_time_ms = 0.0;
     double stdev_time_ms = 0.0;
-    long long peak_mem_kb = 0;
     double mean_displacement = 0.0;
     bool ok = true;
     std::string error;
@@ -201,7 +179,6 @@ static std::optional<RunStats> benchmark_one_target(
 ) {
     RunStats stats;
     stats.times_ms.reserve(static_cast<std::size_t>(iterations));
-    stats.peak_kb_delta.reserve(static_cast<std::size_t>(iterations));
     stats.displacement.reserve(static_cast<std::size_t>(iterations));
 
     auto do_one = [&](bool record) -> bool {
@@ -214,11 +191,9 @@ static std::optional<RunStats> benchmark_one_target(
                 return false;
             }
 
-            const long long base_peak = peak_rss_kb();
             const auto t0 = std::chrono::high_resolution_clock::now();
             const double disp = simplify::simplify_polygon(target_vertices);
             const auto t1 = std::chrono::high_resolution_clock::now();
-            const long long after_peak = peak_rss_kb();
 
             const std::chrono::duration<double, std::milli> dt = t1 - t0;
             const double ms = dt.count();
@@ -232,16 +207,9 @@ static std::optional<RunStats> benchmark_one_target(
                 return false;
             }
 
-            long long delta_kb = -1;
-            if (base_peak >= 0 && after_peak >= 0) {
-                delta_kb = after_peak - base_peak;
-                if (delta_kb < 0) delta_kb = 0;
-            }
-
             if (record) {
                 stats.times_ms.push_back(ms);
                 stats.displacement.push_back(disp);
-                stats.peak_kb_delta.push_back(delta_kb);
             }
 
             return true;
@@ -264,8 +232,7 @@ static std::optional<RunStats> benchmark_one_target(
             std::ostringstream oss;
             oss << "  iter " << (i + 1) << "/" << iterations
                 << " time_ms=" << std::fixed << std::setprecision(3) << stats.times_ms.back()
-                << " disp=" << std::scientific << std::setprecision(6) << stats.displacement.back()
-                << " peak_delta_kb=" << stats.peak_kb_delta.back();
+                << " disp=" << std::scientific << std::setprecision(6) << stats.displacement.back();
             log_msg(verbose, 2, oss.str());
         }
     }
@@ -290,12 +257,6 @@ static AggregatedRow aggregate(
     row.median_time_ms = median(stats.times_ms);
     row.stdev_time_ms = stdev_sample(stats.times_ms);
     row.mean_displacement = mean(stats.displacement);
-
-    long long peak = 0;
-    for (long long v : stats.peak_kb_delta) {
-        if (v > peak) peak = v;
-    }
-    row.peak_mem_kb = peak;
 
     if (!is_finite(row.mean_time_ms) || !is_finite(row.stdev_time_ms) ||
         !is_finite(row.mean_displacement) || !is_finite(row.target_percentage)) {
@@ -401,11 +362,10 @@ static void write_results_csv(
     }
     fout << "\n";
 
-    fout << "Filename,Original_Vertices,Target_Vertices,Target_Percentage,Execution_Time_MS,Peak_Memory_KB,Areal_Displacement,Std_Deviation_MS\n";
+    fout << "Filename,Original_Vertices,Target_Vertices,Target_Percentage,Execution_Time_MS,Areal_Displacement,Std_Deviation_MS\n";
 
     std::size_t ok_count = 0;
     double sum_time = 0.0;
-    double sum_peak = 0.0;
     double sum_disp = 0.0;
 
     for (const auto& r : rows) {
@@ -415,7 +375,6 @@ static void write_results_csv(
             << r.target_vertices << ','
             << std::fixed << std::setprecision(2) << (r.target_percentage * 100.0) << ','
             << std::fixed << std::setprecision(3) << r.mean_time_ms << ','
-            << r.peak_mem_kb << ','
             << std::scientific << std::setprecision(10) << r.mean_displacement << ','
             << std::fixed << std::setprecision(3) << r.stdev_time_ms
             << "\n";
@@ -423,7 +382,6 @@ static void write_results_csv(
         if (r.ok) {
             ++ok_count;
             sum_time += r.mean_time_ms;
-            if (r.peak_mem_kb >= 0) sum_peak += static_cast<double>(r.peak_mem_kb);
             sum_disp += r.mean_displacement;
         }
     }
@@ -432,10 +390,7 @@ static void write_results_csv(
     fout << "# summary_ok_rows=" << ok_count << "\n";
     if (ok_count > 0) {
         fout << "# summary_avg_mean_time_ms=" << std::fixed << std::setprecision(3) << (sum_time / ok_count) << "\n";
-        fout << "# summary_avg_peak_mem_kb=" << std::fixed << std::setprecision(3) << (sum_peak / ok_count) << "\n";
         fout << "# summary_avg_areal_displacement=" << std::scientific << std::setprecision(10) << (sum_disp / ok_count) << "\n";
-        fout << "# summary_mem_efficiency_ratio_kb_per_ms="
-             << std::fixed << std::setprecision(6) << ((sum_time > 0.0) ? (sum_peak / sum_time) : 0.0) << "\n";
     }
 }
 
@@ -445,6 +400,26 @@ int main(int argc, char** argv) {
     try {
         const Options opt = parse_args(argc, argv);
         const std::vector<double> target_pcts = {0.49, 0.22, 0.15, 0.07};
+
+        // Absolute vertex counts observed in the corresponding output files.
+        // These are used as additional benchmark targets for each matching input.
+        const std::unordered_map<std::string, int> output_vertex_counts = {
+            {"blob_with_two_holes",        17},
+            {"cushion_with_hexagonal_hole", 13},
+            {"lake_with_two_islands",       17},
+            {"original_01",                99},
+            {"original_02",                99},
+            {"original_03",                99},
+            {"original_04",                99},
+            {"original_05",                99},
+            {"original_06",                99},
+            {"original_07",                99},
+            {"original_08",                99},
+            {"original_09",                99},
+            {"original_10",                99},
+            {"rectangle_with_two_holes",   11},
+            {"wavy_with_three_holes",      21},
+        };
 
         log_msg(opt.verbose, 1, "Discovering CSV files under: " + opt.input_dir.string());
         const std::vector<fs::path> files = discover_csv_files(opt.input_dir, opt.verbose);
@@ -504,9 +479,31 @@ int main(int argc, char** argv) {
                     continue;
                 }
 
+                // Build the list of (target_vertices, target_percentage) pairs.
+                // Start with the standard percentage-based targets, then append
+                // the exact vertex count observed in the corresponding output file
+                // (if one is registered for this input's stem).
+                std::vector<std::pair<int, double>> targets;
+                targets.reserve(target_pcts.size() + 1);
                 for (double pct : target_pcts) {
-                    const int target = pct_target_round(total_in, pct);
+                    targets.emplace_back(pct_target_round(total_in, pct), pct);
+                }
+                {
+                    std::string stem = csv_path.stem().string();
+                    // Input files are named "input_<stem>.csv"; strip the prefix
+                    // so the lookup matches the keys in output_vertex_counts.
+                    if (stem.rfind("input_", 0) == 0) stem = stem.substr(6);
+                    auto it = output_vertex_counts.find(stem);
+                    if (it != output_vertex_counts.end()) {
+                        const int abs_target = clamp_target(total_in, it->second);
+                        const double abs_pct = (total_in > 0)
+                            ? static_cast<double>(abs_target) / static_cast<double>(total_in)
+                            : 0.0;
+                        targets.emplace_back(abs_target, abs_pct);
+                    }
+                }
 
+                for (const auto& [target, pct] : targets) {
                     std::string err;
                     auto stats_opt = benchmark_one_target(
                         csv_path,
