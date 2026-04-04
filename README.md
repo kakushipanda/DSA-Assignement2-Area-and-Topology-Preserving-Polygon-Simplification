@@ -200,12 +200,33 @@ Outputs are written to:
 - **Runtime vs input size** – shows how execution time grows with the number of vertices. The best‑fit model (e.g., c·n log n or c·n²) is overlaid.
 `benchmark/plots/runtime_vs_input_size.svg`
 ![](./benchmark/plots/runtime_vs_input_size.svg)
-- **Memory vs input size** – peak RSS as a function of input size.
+- **Memory vs input size** – peak RSS as a function of input size. Includes initial overhead + any extra allocations needed by the algorithm.
 `benchmark/plots/memory_vs_input_size.svg`
 ![](./benchmark/plots/memory_vs_input_size.svg)
+- **Memory vs input size (Exclude initial allocation)** – peak RSS as a function of input size. Includes extra allocations needed by the algorithm.
+`benchmark/plots/memory_vs_input_size_clean.svg`
+![](./benchmark/plots/memory_vs_input_size_clean.svg)
 - **Areal displacement vs target vertices** – how much the polygon area changes when aggressively simplifying.
 `benchmark/plots/areal_displacement_vs_target.svg`
 ![](./benchmark/plots/areal_displacement_vs_target.svg)
+
+### The drastic difference in RSS values comes from a combination of fixed overhead and threshold‑triggered allocations in the algorithm’s data structures.
+
+1. Very small inputs (n ≤ 353) – RSS ≈ 12 KB
+    - This extremely low value (12 KB) is likely the baseline memory of the process itself: the executable code, static data, and a tiny stack.
+
+    - For these small polygons, the dynamic allocations (vertex pool, rings, spatial grid, priority queue) are either not yet allocated or are so small that they fit within the initial heap pages already counted in the baseline.
+
+    - The measurement method (/proc/.../status – VmRSS) may also have coarse granularity (reported in KB) and could round down very small heap allocations.
+
+2. First jump (n = 436) – RSS jumps to 3676 KB
+    - At some critical size (between 353 and 436 vertices), the algorithm’s spatial grid (a hash map from cell keys to edge lists) allocates its initial bucket array.
+
+    - The grid size is chosen based on the bounding box and vertex count. For n ~ 400, the cell size becomes small enough that many cells are created, and the hash table (std::unordered_map) may allocate a large contiguous array of buckets (often a power of two, e.g., 2048 or 4096 buckets).
+
+    - The priority queue also allocates its internal container (usually a std::vector) with an initial capacity. For n > 400, the queue may reserve space for all possible collapse candidates (roughly O(n)).
+
+Both allocations happen at once, causing a discrete jump of ~3 MB.
 
 ### Experimental Test Cases – Descriptions
 This folder contains synthetic and real‑world inspired polygon inputs designed to stress‑test the APSC simplifier beyond the basic reference suite. Each file targets a specific geometric or numerical challenge.

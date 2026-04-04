@@ -290,6 +290,18 @@ def main():
               y_scale='linear',
               equation_text=f'y={best_mem[1][0]:.3e}*f(n)+{best_mem[1][1]:.3e}')
 
+    indexes = [i for i in range(len(xs)) if ys_mem[i] > min(ys_mem)]
+    only_realloc_x = [xs[i] for i in indexes]
+    only_realloc_y =  [ys_mem[i] for i in indexes]
+    fits_realloc_mem = fit_models(only_realloc_x, only_realloc_y)
+    best_realloc_mem = max(fits_realloc_mem.items(), key=lambda kv: kv[1][2])
+
+    write_svg(PLOTS / 'memory_vs_input_size_clean.svg', 'Peak RSS vs Input Size', 'Input vertices (n)', 'Peak RSS (kB)',
+              only_realloc_x, only_realloc_y, best_realloc_mem[0], best_realloc_mem[1][0], best_realloc_mem[1][1], model_fn[best_realloc_mem[0]],
+              y_scale='linear',
+              equation_text=f'y={best_realloc_mem[1][0]:.3e}*f(n)+{best_realloc_mem[1][1]:.3e}')
+
+
     # Sort for plotting left-to-right to avoid visual zig-zag caused by descending target order.
     disp_rows = sorted(disp_rows, key=lambda r: r['target_vertices'])
     dx = [r['target_vertices'] for r in disp_rows]

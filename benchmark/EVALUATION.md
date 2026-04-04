@@ -9,8 +9,8 @@
 - Displacement fit is anchored at zero for the unsimplified endpoint: y = a*(1/x² - 1/x_max²).
 
 ## Best-fit scaling models
-- Runtime best fit: **c*n**, c=3.708718e-06, b=1.694256e-03, R^2=0.9764.
-- Memory best fit: **c*sqrt(n)**, c=9.771478e+01, b=-5.310725e+02, R^2=0.6790.
+- Runtime best fit: **c*n**, c=3.937295e-06, b=1.767199e-03, R^2=0.9782.
+- Memory best fit: **c*sqrt(n)**, c=9.777132e+01, b=-5.304082e+02, R^2=0.6782.
 
 ## Plots
 - `benchmark/plots/runtime_vs_input_size.svg`
