@@ -22,8 +22,11 @@ LDFLAGS  :=
 # ---------------------------------------------------------------------------
 # Sources
 # ---------------------------------------------------------------------------
-SRC := $(wildcard src/*.cpp)
+SRC := $(filter-out src/main.cpp src/benchmark.cpp, $(wildcard src/*.cpp))
+
 OBJ := $(SRC:.cpp=.o)
+OBJ_MAIN := $(OBJ) src/main.o
+OBJ_BENCHMARK := $(OBJ) src/benchmark.o
 
 # ---------------------------------------------------------------------------
 # Test cases  format: input_path:target_vertices
@@ -117,13 +120,17 @@ endef
 # ---------------------------------------------------------------------------
 .PHONY: all clean test test-extra test-all evaluate
 
-all: simplify area_and_topology_preserving_polygon_simplification
+all: simplify simplify_benchmark area_and_topology_preserving_polygon_simplification
 
-simplify: $(OBJ)
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJ) $(LDFLAGS)
+simplify: $(OBJ_MAIN)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_MAIN) $(LDFLAGS)
+
+simplify_benchmark: $(OBJ_BENCHMARK)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJ_BENCHMARK) $(LDFLAGS)
 
 area_and_topology_preserving_polygon_simplification: simplify
 	cp simplify area_and_topology_preserving_polygon_simplification
+	cp simplify_benchmark benchmark
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -159,4 +166,6 @@ clean:
 	      simplify \
 	      area_and_topology_preserving_polygon_simplification \
 	      test_cases/my_output_*.txt \
-	      experimental_cases/my_output_*.txt
+	      experimental_cases/my_output_*.txt\
+				simplify_benchmark \
+				benchmark
