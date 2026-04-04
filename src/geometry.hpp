@@ -182,7 +182,38 @@ inline double shoelace_area(const Point* pts, int n) {
 inline double compute_displacement(const Point& A, const Point& B,
                                    const Point& C, const Point& D,
                                    const Point& E) {
-    // Intersections between the two chains A-B-C-D and A-E-D.
+    // Fast path (Green's theorem): when the two chains A→B→C→D and A→E→D
+    // don't properly cross, the displacement equals the absolute shoelace
+    // area of the closed polygon A→B→C→D→E→A — five cross products, O(1).
+    {
+        Point segs[5][2] = {{A,B},{B,C},{C,D},{A,E},{E,D}};
+        const int pairs[4][2] = {{0,4},{1,3},{1,4},{2,3}};
+        bool has_crossing = false;
+        for (int p = 0; p < 4; ++p) {
+            const int i = pairs[p][0], j = pairs[p][1];
+            const double dx1 = segs[i][1].x - segs[i][0].x;
+            const double dy1 = segs[i][1].y - segs[i][0].y;
+            const double dx2 = segs[j][1].x - segs[j][0].x;
+            const double dy2 = segs[j][1].y - segs[j][0].y;
+            const double denom = dx1 * dy2 - dy1 * dx2;
+            if (std::fabs(denom) < 1e-20) continue;
+            const double dx3 = segs[j][0].x - segs[i][0].x;
+            const double dy3 = segs[j][0].y - segs[i][0].y;
+            const double t = (dx3 * dy2 - dy3 * dx2) / denom;
+            const double u = (dx3 * dy1 - dy3 * dx1) / denom;
+            if (t > 1e-12 && t < 1.0 - 1e-12 && u > 1e-12 && u < 1.0 - 1e-12) {
+                has_crossing = true;
+                break;
+            }
+        }
+        if (!has_crossing) {
+            const double area = cross2(A, B) + cross2(B, C) + cross2(C, D)
+                              + cross2(D, E) + cross2(E, A);
+            return std::fabs(0.5 * area);
+        }
+    }
+
+    // Slow path: chains cross — full lobe decomposition needed.
     struct XPt { double gp1, gp2; Point pt; };
     XPt xpts[16];
     int nxp = 0;
