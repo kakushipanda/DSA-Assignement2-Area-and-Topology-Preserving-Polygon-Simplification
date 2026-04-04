@@ -207,8 +207,32 @@ Outputs are written to:
 `benchmark/plots/areal_displacement_vs_target.svg`
 ![](./benchmark/plots/areal_displacement_vs_target.svg)
 
+### Experimental Test Cases – Descriptions
+This folder contains synthetic and real‑world inspired polygon inputs designed to stress‑test the APSC simplifier beyond the basic reference suite. Each file targets a specific geometric or numerical challenge.
 
-For a detailed discussion of the results, see `benchmark/EVALUATION.md` and the README inside the `experimental_cases/` folder (which describes the challenging datasets used for validation).
+| File | Vertices | Rings |	Description & Challenge |
+| -------- | ------- | ------- | ------- |
+input_minimal_triangle.csv | 3| 1|	Simplest possible polygon (triangle). Tests degenerate case where target ≥ original → no change.
+input_axis_aligned_square.csv|	4|	1|	Axis‑aligned square. Checks simplification to 2 vertices (a diagonal) – must preserve area (200 units²).
+input_triangle_hole_minimal.csv|	7| (outer 4 + hole 3)	|2	Square outer ring with a small triangular hole. Tests hole preservation when outer ring shrinks. Hole area = 45 units².
+input_tiny_hole_clearance.csv|	7 |(outer 4 + hole 3)	|2	Outer square 50×50, hole is a tiny near‑degenerate triangle at (25,25.2) etc. Tests numerical stability when hole is extremely close to outer boundary.
+input_four_holes_compact.csv|	16 |(outer 4 + 4 holes of 3 vertices each)|	5	Outer square with four small triangular holes arranged in a grid. Tests many holes in close proximity.
+input_narrow_corridor.csv|8	|1	|A corridor that narrows to a 4‑unit wide passage. Tests that simplification does not create self‑intersections in thin regions.
+input_near_collinear_large.csv	|5|	1	|Large coordinates (~1e6) with near‑collinear points. Tests floating‑point robustness for nearly straight edges.
+input_large_with_hole.csv	| 8 |(outer 4 + hole 4)	|2	Outer square from -5e6 to +5e6, inner square hole from -1e6 to +1e6. Tests handling of very large coordinate ranges.
+input_regular32.csv |	32 |	1	 |Regular 32‑gon inscribed in circle of radius 100. Baseline for scaling and displacement vs. target.
+input_regular128.csv |	128|	1|	Regular 128‑gon, radius 250. Scaling test.
+input_regular256.csv	|256|	1|	Regular 256‑gon, radius 300. Scaling test.
+input_star20.csv	|20|	1|	Star polygon (10 points alternating inner/outer radius). Many reflex vertices – tests ability to preserve area while removing deep notches.
+input_skinny_rectangle_6.csv|	6|	1|	Extremely thin rectangle (200×1) with a small indentation. Tests simplification of near‑degenerate skinny shapes.
+input_negative_coords_mixed.csv	|5|	1|	Polygon with negative coordinates and mixed orientation. Tests correct area sign handling.
+input_spike24.csv	|24|	1|	Polygon with long spikes (alternating between radius 150 and near zero). Tests simplification of sharp protrusions.
+input_dual_hole_narrow_gap.csv	|12| (outer 4 + two holes of 4 each)|	3	Two square holes separated by a gap of only 2 units. Tests that holes are not merged and no edges cross the narrow gap.
+input_eight_holes_field.csv	|28| (outer 4 + eight holes of 3 each)|	9	Outer square with an 4×2 grid of tiny triangular holes. Many holes close together – tests spatial grid and intersection performance.
+input_offset_large_small.csv	|8| (outer 4 + hole 4)|	2	Outer rectangle (10002000×10001000) with a small hole offset near one corner. Tests simplification with mixed large and small coordinates.
+input_zigzag40_band.csv|	42	|1|	A band that zigzags up and down, then closes with a top edge. Many collinear and nearly collinear edges – tests detection of redundant vertices.
+input_concave_notch_10.csv	|10|	1	|Concave polygon with a deep rectangular notch. Tests that simplification does not cut off the notch incorrectly.
+
 
 ## Project Structure
 text
